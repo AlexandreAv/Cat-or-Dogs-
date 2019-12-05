@@ -6,7 +6,6 @@
 # In[1]:
 
 
-from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 from PIL import Image
 import numpy as np
@@ -15,8 +14,6 @@ from tensorflow.keras.layers import Conv2D, Flatten, Dense, MaxPool2D, Dropout
 from tensorflow.keras.losses import CategoricalCrossentropy
 from tensorflow.keras.optimizers import Adam
 from glob import glob
-import random
-import pdb
 from data import DataGenerator
 
 tf.debugging.set_log_device_placement(True)
@@ -29,8 +26,8 @@ print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('
 
 
 LEARNING_RATE = 0.0001
-EPOCH = 10
-BATCH_SIZE = 200
+EPOCH = 100
+BATCH_SIZE = 250
 NUMBER_PREDICTIONS = 2
 TEST_SIZE = 0.2
 
@@ -41,11 +38,11 @@ TEST_SIZE = 0.2
 IMAGE_WIDTH = 200
 IMAGE_HEIGHT = 200
 
-path = glob('./dataset/train/*.jpg')
-# path = ('./dataset/train/cat.0.jpg', './dataset/train/cat.1.jpg', './dataset/train/cat.2.jpg', './dataset/train/cat.3.jpg',
-#         './dataset/train/dog.0.jpg', './dataset/train/dog.1.jpg', './dataset/train/dog.2.jpg', './dataset/train/dog.3.jpg')
+path = glob('C:/dataset/train/*.jpg')
+# path = ('./dataset/train/cat.0.jpg', './dataset/train/cat.1.jpg', './dataset/train/cat.dog.2.jpg', './dataset/train/cat.3.jpg',
+#         './dataset/train/dog.0.jpg', './dataset/train/dog.1.jpg', './dataset/train/dog.dog.2.jpg', './dataset/train/dog.3.jpg')
 
-dataset = DataGenerator(path, (IMAGE_WIDTH, IMAGE_HEIGHT), BATCH_SIZE, TEST_SIZE)
+dataset = DataGenerator(path, (IMAGE_WIDTH, IMAGE_HEIGHT), BATCH_SIZE, TEST_SIZE, number_calls=4, image_flip=True, brightness_value_range=(0, 1))
 
 
 # ## On affiche quelques images de la dataset après la 1er étape du proprocessing
@@ -69,33 +66,29 @@ dataset = DataGenerator(path, (IMAGE_WIDTH, IMAGE_HEIGHT), BATCH_SIZE, TEST_SIZE
 class ConvModel(tf.keras.Model):
     def __init__(self):
         super(ConvModel, self).__init__()
-        self.conv1 = Conv2D(16, 3, activation='relu', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 3))
-        self.conv2 = Conv2D(32, 3, activation='relu', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 3))
-        self.pool1 = MaxPool2D()
+        self.conv1 = Conv2D(32, (3, 3), activation='relu', input_shape=(IMAGE_WIDTH, IMAGE_HEIGHT, 3))
+        self.pool1 = MaxPool2D((2, 2))
         self.dropout1 = Dropout(0.2)
-        self.conv3 = Conv2D(64, 3, padding='same', activation='relu')
-        self.pool2 = MaxPool2D()
+        self.conv2 = Conv2D(64, (3, 3), activation='relu')
+        self.pool2 = MaxPool2D((3, 3))
         self.dropout2 = Dropout(0.2)
-        self.conv4 = Conv2D(128, 3, padding='same', activation='relu')
-        self.pool3 = MaxPool2D()
-        self.pool4 = MaxPool2D(pool_size=4)
-        self.dropout3 = Dropout(0.2)
+        self.conv3 = Conv2D(64, (3, 3), activation='relu')
+        self.pool3 = MaxPool2D((3, 3))
+        # self.dropout3 = Dropout(0.3)
         self.flatten = Flatten(name='flatten')
-        self.dens1 = Dense(512, activation='relu', name='dens1')
+        self.dens1 = Dense(128, activation='relu', name='dens1')
         self.out = Dense(NUMBER_PREDICTIONS, activation='softmax', name='output')
 
     def call(self, image):
         x = self.conv1(image)
-        x = self.conv2(x)
         x = self.pool1(x)
         x = self.dropout1(x)
-        x = self.conv3(x)
+        x = self.conv2(x)
         x = self.pool2(x)
         x = self.dropout2(x)
-        x = self.conv4(x)
+        x = self.conv3(x)
         x = self.pool3(x)
-        x = self.pool4(x)
-        x = self.dropout3(x)
+        # x = self.dropout3(x)
         x = self.flatten(x)
         x = self.dens1(x)
 
@@ -157,8 +150,8 @@ def valid_step(images, targets):
 
 
 for epoch in range(EPOCH):
-    train_set = dataset.it_train_data()
-    valid_set = dataset.it_valid_data()
+    train_set = dataset.get_train_data()
+    valid_set = dataset.get_valid_data()
 
     for x_train, y_train in train_set:
         train(tf.convert_to_tensor(x_train, dtype=tf.float32), tf.convert_to_tensor(y_train))
@@ -172,7 +165,7 @@ for epoch in range(EPOCH):
     template = "Valid Loss: {}, Valid Accuracy: {}%"
     print(template.format(metrics_valid_loss.result(), metrics_valid_accuracy.result() * 100))
 
-    if metrics_valid_loss.result() > 0.85:
+    if metrics_valid_accuracy.result() > 0.80:
         model.save_weights('save/model.tf')
 
     metrics_train_loss.reset_states()
